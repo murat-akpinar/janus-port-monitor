@@ -1,5 +1,4 @@
-# janus-port-monitor
-# Python TUI Trafik İzleme Uygulaması
+# Janus Port Monitor
 
 Bu uygulama, belirli bir port üzerinde akan trafiği gerçek zamanlı olarak izlemek için bir TUI (Terminal User Interface) sunar. Aşağıdaki yönergeler, uygulamanın Debian tabanlı ve Red Hat tabanlı sistemlerde çalıştırılması için gerekli bağımlılıkları kurmanıza yardımcı olacaktır.
 
