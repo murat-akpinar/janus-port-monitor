@@ -2,17 +2,19 @@ import npyscreen
 from time import sleep
 from threading import Thread
 import subprocess
+from collections import deque
 
 
 class TrafficMonitor:
     """Monitor traffic on listening ports."""
-    MAX_LOGS = 50  # Logları sınırlandırmak için
+    MAX_LOGS = 50  # Maksimum log sayısını sınırla
 
     def __init__(self):
-        self.logs = []
+        self.logs = deque(maxlen=self.MAX_LOGS)  # Logları saklamak için deque
         self.running = True
         self.listening_ports = []
         self.selected_port = None
+        self.previous_traffic = set()  # Daha önce görülen trafiği saklamak için
 
     def fetch_listening_ports(self):
         """Fetch all listening ports dynamically."""
@@ -36,7 +38,9 @@ class TrafficMonitor:
         """Fetch traffic for the selected port."""
         while self.running:
             if not self.selected_port:
-                self.logs = ["No port selected"]
+                self.logs.clear()
+                self.logs.append("No port selected")
+                self.previous_traffic.clear()  # Önceki verileri temizle
             else:
                 try:
                     result = subprocess.run(
@@ -46,15 +50,19 @@ class TrafficMonitor:
                         line for line in result.stdout.splitlines()
                         if f":{self.selected_port}" in line
                     ]
-                    if traffic:
-                        self.logs = traffic + self.logs  # Yeni verileri en üste ekle
-                    else:
-                        self.logs = [f"No traffic on port {self.selected_port}"] + self.logs
 
-                    # Log uzunluğunu sınırlıyoruz ki sonsuza kadar büyümesin
-                    self.logs = self.logs[:self.MAX_LOGS]
+                    # Sadece yeni gelen verileri ekleyelim
+                    new_traffic = [line for line in traffic if line not in self.previous_traffic]
+
+                    if new_traffic:
+                        self.logs.extendleft(new_traffic)  # Yeni gelenleri en üstte göster
+                        self.previous_traffic.update(new_traffic)  # Görülenleri kaydet
+
+                    if not traffic:
+                        self.logs.appendleft(f"No traffic on port {self.selected_port}")
+
                 except Exception as e:
-                    self.logs = [f"Error: {str(e)}"] + self.logs
+                    self.logs.appendleft(f"Error: {str(e)}")
 
             sleep(1)
 
@@ -108,14 +116,17 @@ class MainForm(npyscreen.FormBaseNew):
             selected_port_index = self.port_list.value
             if selected_port_index is not None and selected_port_index < len(self.traffic_monitor.listening_ports):
                 new_selected_port = self.traffic_monitor.listening_ports[selected_port_index]
+
+                # Eğer seçili port değiştiyse eski logları temizle
                 if new_selected_port != self.previous_port:
-                    self.traffic_monitor.logs = []  # Yeni porta geçince logları temizle
+                    self.traffic_monitor.logs.clear()
+                    self.traffic_monitor.previous_traffic.clear()
                     self.previous_port = new_selected_port  # Önceki portu güncelle
 
                 self.traffic_monitor.selected_port = new_selected_port
 
             # Update traffic logs dynamically (en yeni veriler en üstte)
-            self.log_box.values = self.traffic_monitor.logs
+            self.log_box.values = list(self.traffic_monitor.logs)
             self.log_box.display()
             sleep(1)
 
